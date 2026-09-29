@@ -1,13 +1,7 @@
 // src/context/AuthContext.tsx
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { fetchMe, login as apiLogin, logout as apiLogout, ApiError } from "../api/client";
-import type { UserRole } from "../types";
-import { fetchMe, login, logout, ApiError } from "../api/client";
-interface AuthUser {
-  id: string;
-  email: string;
-  role: UserRole;
-}
+import type { AuthUser } from "../types";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -30,11 +24,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
+
     fetchMe()
       .then((res) => setUser(res.user))
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
           apiLogout();
+          setUser(null);
           setSessionExpired(true);
         }
       })
@@ -43,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(email: string, password: string) {
     const result = await apiLogin(email, password);
-    setUser({ id: "", email: result.email, role: result.role });
+    setUser(result.user); // real id, email and role from the server
     setSessionExpired(false);
   }
 
@@ -59,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");

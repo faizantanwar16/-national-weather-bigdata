@@ -1,140 +1,49 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+// src/api/client.ts
+import type { LoginResponse, MeResponse } from "../types";
 
-type RequestOptions = RequestInit & {
-  token?: string;
-};
+const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const TOKEN_KEY = "nwbdap_token";
 
-async function request<T>(
-  endpoint: string,
-  options: RequestOptions = {}
-): Promise<T> {
-  const { token, ...fetchOptions } = options;
-
-  const headers = new Headers(fetchOptions.headers);
-
-  headers.set("Content-Type", "application/json");
-
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
   }
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...fetchOptions,
-    headers,
-  });
-
-  if (!response.ok) {
-    let message = `API Error: ${response.status}`;
-
-    try {
-      const errorData = await response.json();
-
-      if (errorData?.message) {
-        message = errorData.message;
-      } else if (errorData?.error) {
-        message = errorData.error;
-      }
-    } catch {
-      // Response was not JSON
-    }
-
-    throw new Error(message);
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json();
 }
 
-/* =========================
-   GET
-========================= */
-
-export async function get<T>(
-  endpoint: string,
-  options?: RequestOptions
-): Promise<T> {
-  return request<T>(endpoint, {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = sessionStorage.getItem(TOKEN_KEY);
+  const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
-    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers ?? {}),
+    },
   });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, body.detail ?? body.message ?? res.statusText);
+  }
+  return res.json() as Promise<T>;
 }
 
-/* =========================
-   POST
-========================= */
+export function fetchMe(): Promise<MeResponse> {
+  return request<MeResponse>("/auth/me");
+}
 
-export async function post<T>(
-  endpoint: string,
-  body?: unknown,
-  options?: RequestOptions
-): Promise<T> {
-  return request<T>(endpoint, {
-    ...options,
+export async function login(email: string, password: string): Promise<LoginResponse> {
+  const data = await request<LoginResponse>("/auth/login", {
     method: "POST",
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: JSON.stringify({ email, password }),
   });
+  sessionStorage.setItem(TOKEN_KEY, data.token);
+  return data;
 }
 
-/* =========================
-   PUT
-========================= */
-
-export async function put<T>(
-  endpoint: string,
-  body?: unknown,
-  options?: RequestOptions
-): Promise<T> {
-  return request<T>(endpoint, {
-    ...options,
-    method: "PUT",
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+export function logout(): void {
+  sessionStorage.removeItem(TOKEN_KEY);
 }
-
-/* =========================
-   PATCH
-========================= */
-
-export async function patch<T>(
-  endpoint: string,
-  body?: unknown,
-  options?: RequestOptions
-): Promise<T> {
-  return request<T>(endpoint, {
-    ...options,
-    method: "PATCH",
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-}
-
-/* =========================
-   DELETE
-========================= */
-
-export async function remove<T>(
-  endpoint: string,
-  options?: RequestOptions
-): Promise<T> {
-  return request<T>(endpoint, {
-    ...options,
-    method: "DELETE",
-  });
-}
-
-/* =========================
-   API CLIENT
-========================= */
-
-export const apiClient = {
-  get,
-  post,
-  put,
-  patch,
-  delete: remove,
-};
-
-export default apiClient;

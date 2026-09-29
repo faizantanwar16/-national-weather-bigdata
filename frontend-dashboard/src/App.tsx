@@ -3,7 +3,7 @@ import { Link, NavLink, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 
-import Dashboard from "./pages/Dashboard";
+//import Dashboard from "./pages/Dashboard";
 import ReportForm from "./pages/ReportForm";
 import TrackReport from "./pages/TrackReport";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -49,7 +49,7 @@ function NotFound() {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Dashboard />} />
+      
       <Route path="/report" element={<ReportForm />} />
       <Route path="/track" element={<TrackReport />} />
       <Route path="/track/:reportId" element={<TrackReport />} />
