@@ -1,0 +1,49 @@
+import requests
+
+# Ask user for location
+location = input("Enter city name: ")
+
+# Step 1: Find latitude and longitude
+geo_url = "https://geocoding-api.open-meteo.com/v1/search"
+
+geo_params = {
+    "name": location,
+    "count": 1,
+    "format": "json"
+}
+
+geo_response = requests.get(geo_url, params=geo_params)
+geo_data = geo_response.json()
+
+# Check if location was found
+if "results" in geo_data:
+
+    latitude = geo_data["results"][0]["latitude"]
+    longitude = geo_data["results"][0]["longitude"]
+
+    print("Location found:", geo_data["results"][0]["name"])
+    print("Latitude:", latitude)
+    print("Longitude:", longitude)
+
+    # Step 2: Get weather data
+    weather_url = "https://api.open-meteo.com/v1/forecast"
+
+    weather_params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "current": "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
+    }
+
+    weather_response = requests.get(weather_url, params=weather_params)
+    weather_data = weather_response.json()
+
+    current = weather_data["current"]
+
+    print("\n----- Current Weather -----")
+    print("Temperature:", current["temperature_2m"], "°C")
+    print("Humidity:", current["relative_humidity_2m"], "%")
+    print("Rain/Precipitation:", current["precipitation"], "mm")
+    print("Wind Speed:", current["wind_speed_10m"], "km/h")
+
+else:
+    print("Location not found.")
