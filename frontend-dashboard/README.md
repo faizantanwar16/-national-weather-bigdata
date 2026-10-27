@@ -1,75 +1,32 @@
-# React + TypeScript + Vite
+# NWA Platform: frontend-dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript + Vite. Dark "weather operations" UI with a left sidebar, live map, alerts, analytics, a report form and a staff console.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+    npm install
+    npm run dev          # http://localhost:5173
+    npm run build        # production build in dist/
 
-## React Compiler
+The app calls `backend-api` at `http://localhost:4000`. Change it with `VITE_API_URL` in a `.env` file.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Demo mode
 
-## Expanding the ESLint configuration
+If the backend can't be reached, the app switches to realistic sample data automatically (a "DEMO DATA" badge shows in the top bar). Force it with `VITE_DEMO=1`. Sample staff sign-in: use the "Explore the admin console with sample data" button on the sign-in page.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Pages
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| Sidebar item | Route | Who |
+|---|---|---|
+| Overview | `/` | public |
+| Live Map | `/map` | public |
+| Weather Events | `/events` | public |
+| Analytics | `/analytics` | public |
+| Reports (submit) | `/report`, `/track/:id` | public |
+| Alerts | `/alerts` | public |
+| Verification | `/verification` | moderator, admin |
+| Data Sources, Admin Panel, System Health, Settings | `/sources`, `/admin`, `/health`, `/settings` | admin |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Where the data comes from
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
-
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
+All data access goes through `src/api/gateway.ts`. It calls your backend first and falls back to sample data. Endpoints it expects from SRS section 7.1 that your backend may not have yet: `/api/stream` (SSE), `/api/media`, `/api/clusters/:id`, `/api/admin/reports/:id`, `/api/admin/sources`, `/api/admin/pipeline`, plus `/api/alerts` and `/api/weather?city=` for official alerts and conditions. Screens that need a missing endpoint fall back or say "not available yet".
