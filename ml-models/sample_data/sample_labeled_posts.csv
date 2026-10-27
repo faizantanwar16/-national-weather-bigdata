@@ -1,0 +1,41 @@
+id,text,label
+1,"Heavy rainfall in Pune since morning, roads waterlogged #IMD",rainfall
+2,"bahut zyada baarish ho rahi hai mumbai mein #rain",rainfall
+3,"Light drizzle continuing in Nagpur since noon",rainfall
+4,"It has been raining non stop in Kolkata for 3 hours #IMD",rainfall
+5,"Steady rain across Bengaluru this evening, umbrellas out",rainfall
+6,"Loud thunder and lightning over Delhi NCR right now #IMD",thunderstorm
+7,"Thunderstorm warning issued for eastern UP tonight",thunderstorm
+8,"Bijli chamak rahi hai, zoron ki garaj ke sath baarish #IMD",thunderstorm
+9,"Massive lightning strikes near the airport, flight delayed",thunderstorm
+10,"Sudden thunderstorm hit Hyderabad in the last 20 minutes",thunderstorm
+11,"Streets completely flooded in Chennai, water entering homes #IMD",flood
+12,"Assam floods worsening, several villages submerged this week",flood
+13,"Flood alert issued for low lying areas of Patna",flood
+14,"Water level rising fast in the river, flooding nearby colonies",flood
+15,"Severe waterlogging turned into flooding near MG road #flood",flood
+16,"Temperature crossed 45 degrees in Delhi today, brutal heatwave #IMD",heatwave
+17,"IMD issues heatwave warning for Rajasthan this week",heatwave
+18,"Garmi itni zyada hai ki bahar nikalna mushkil ho gaya",heatwave
+19,"Heatwave conditions persist across Vidarbha region",heatwave
+20,"Record high temperature recorded in Nagpur, heatwave alert issued",heatwave
+21,"Dense fog reduces visibility to near zero in Delhi this morning #IMD",fog
+22,"Fog delays several trains and flights in North India",fog
+23,"Kohra itna tha ki kuch dikhayi nahi de raha tha subah",fog
+24,"Thick fog blanket over Lucknow, visibility below 50 meters",fog
+25,"Morning fog expected to persist till 10am in Chandigarh",fog
+26,"Massive dust storm hits Jaipur, visibility drops sharply #IMD",dust_storm
+27,"Dhool bhari aandhi ke karan sadak par kuch nahi dikh raha",dust_storm
+28,"Dust storm warning for western Rajasthan this evening",dust_storm
+29,"Strong dust storm swept through Jodhpur an hour ago",dust_storm
+30,"Orange dust haze covering the sky in Bikaner right now",dust_storm
+31,"Strong winds uprooted several trees in Mumbai overnight #IMD",strong_wind
+32,"Gale force winds reported along the Odisha coast",strong_wind
+33,"Tez hawa ke karan bijli ke khambe gir gaye",strong_wind
+34,"High speed winds damaged rooftops in coastal Andhra",strong_wind
+35,"Wind speed crossed 60 kmph during the storm last night",strong_wind
+36,"Just finished a great cricket match, what a game! #IPL",not_weather
+37,"Happy birthday to my best friend, love you so much",not_weather
+38,"New phone launch event happening today in Bangalore",not_weather
+39,"This traffic jam has nothing to do with rain, just bad planning",not_weather
+40,"IMD should also fix the economy lol #sarcasm",not_weather
