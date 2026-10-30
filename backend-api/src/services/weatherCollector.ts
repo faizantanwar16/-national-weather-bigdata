@@ -39,6 +39,10 @@ async function pollOnce() {
 
 export async function startWeatherCollector() {
   await ensureOfficialSources();
+  if (process.env.DISABLE_WEATHER_COLLECTOR === "true" || process.env.PIPELINE_MODE === "external") {
+    console.log("[collector] Weather collector disabled (Python is handling official observations)");
+    return;
+  }
   if (!process.env.OPENWEATHER_API_KEY) { console.log("[collector] OPENWEATHER_API_KEY not set: official observations are off"); return; }
   const loop = async () => { await pollOnce().catch(() => undefined); const sec = await getSetting<number>("collectors.api.intervalSec"); setTimeout(loop, sec * 1000).unref(); };
   loop();

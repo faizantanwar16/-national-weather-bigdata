@@ -1,0 +1,149 @@
+"""
+Fetches current weather for a city from Open-Meteo, derives a simple
+event category from the numbers (rule-based — NOT the trained text
+classifier, see note below), stores the reading in MongoDB, and prints
+the final result.
+
+Usage:
+    python weather_data.py
+"""
+
+import os
+import sys
+from datetime import datetime, timezone
+
+import requests
+from dotenv import find_dotenv, load_dotenv
+from pymongo import MongoClient
+
+# --- Load MONGODB_URI / DB_NAME from the nearest .env, wherever it is ---
+load_dotenv(find_dotenv())
+
+GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
+WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+
+
+def get_coordinates(location: str):
+    """Look up latitude/longitude for a city name via Open-Meteo's geocoder."""
+    params = {"name": location, "count": 1, "format": "json"}
+    response = requests.get(GEOCODE_URL, params=params, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+
+    if "results" not in data or not data["results"]:
+        return None
+
+    result = data["results"][0]
+    return {
+        "name": result["name"],
+        "latitude": result["latitude"],
+        "longitude": result["longitude"],
+    }
+
+
+def get_current_weather(latitude: float, longitude: float):
+    """Fetch current temperature, humidity, precipitation and wind speed."""
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "current": "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m",
+    }
+    response = requests.get(WEATHER_URL, params=params, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+
+    if "current" not in data:
+        return None
+
+    return data["current"]
+
+
+def derive_event_category(current: dict) -> str:
+    """
+    Rule-based tagging from numeric thresholds — deliberately simple for
+    Phase-I. These cutoffs are illustrative starting points, not
+    IMD-calibrated thresholds; tune them once you have real comparison
+    data.
+    """
+    precipitation = current.get("precipitation", 0) or 0
+    wind_speed = current.get("wind_speed_10m", 0) or 0
+    temperature = current.get("temperature_2m", 0) or 0
+
+    if wind_speed >= 40:
+        return "strong_wind"
+    if precipitation >= 10:
+        return "rainfall"
+    if precipitation > 0:
+        return "rainfall"  # light rain still counts as rainfall, just noted separately below
+    if temperature >= 40:
+        return "heatwave"
+    return "clear"
+
+
+def store_reading(location_name: str, latitude: float, longitude: float,
+                   current: dict, category: str):
+    """Insert this reading into the reference_weather collection."""
+    uri = os.environ.get("MONGODB_URI")
+    if not uri:
+        print("Warning: MONGODB_URI not found in .env — skipping database save.")
+        return None
+
+    client = MongoClient(uri)
+    db = client[os.environ.get("DB_NAME", "weather_platform")]
+    collection = db["reference_weather"]
+
+    document = {
+        "source": "open-meteo",
+        "location_name": location_name,
+        "location": {"type": "Point", "coordinates": [longitude, latitude]},  # GeoJSON: lon first
+        "fetched_at": datetime.now(timezone.utc),
+        "temperature_c": current.get("temperature_2m"),
+        "humidity_pct": current.get("relative_humidity_2m"),
+        "precipitation_mm": current.get("precipitation"),
+        "wind_speed_kmh": current.get("wind_speed_10m"),
+        "derived_category": category,
+    }
+
+    result = collection.insert_one(document)
+    client.close()
+    return result.inserted_id
+
+
+def main():
+    location_input = input("Enter city name: ")
+
+    location = get_coordinates(location_input)
+    if location is None:
+        print("Location not found.")
+        sys.exit(1)
+
+    print("Location found:", location["name"])
+    print("Latitude:", location["latitude"])
+    print("Longitude:", location["longitude"])
+
+    current = get_current_weather(location["latitude"], location["longitude"])
+    if current is None:
+        print("Could not retrieve current weather data.")
+        sys.exit(1)
+
+    category = derive_event_category(current)
+    inserted_id = store_reading(
+        location["name"], location["latitude"], location["longitude"],
+        current, category,
+    )
+
+    print("\n----- Current Weather -----")
+    print("Temperature:", current["temperature_2m"], "°C")
+    print("Humidity:", current["relative_humidity_2m"], "%")
+    print("Rain/Precipitation:", current["precipitation"], "mm")
+    print("Wind Speed:", current["wind_speed_10m"], "km/h")
+    print("Derived Category:", category)
+
+    if inserted_id:
+        print(f"\nSaved to MongoDB (reference_weather) with id: {inserted_id}")
+    else:
+        print("\nNot saved to MongoDB — check MONGODB_URI in your .env file.")
+
+
+if __name__ == "__main__":
+    main()

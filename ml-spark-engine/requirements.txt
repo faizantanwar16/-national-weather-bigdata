@@ -1,0 +1,18 @@
+pandas
+numpy
+scikit-learn
+joblib
+spacy
+datasketch
+imagehash
+pillow
+atproto
+Mastodon.py
+requests
+python-dotenv
+websockets
+pymongo
+pyspark>=4.0.0  # Java 17+ compatible (Hadoop 3.4+); 3.5.x fails on Java 21+
+ 
+# after installing, run once:
+#   python -m spacy download en_core_web_sm

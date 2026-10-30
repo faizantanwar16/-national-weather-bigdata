@@ -1,12 +1,16 @@
 import { Router, Request, Response } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { Report } from "../models/Report";
+import { Report, EventCategory } from "../models/Report";
+import { Source } from "../models/Source";
+import { VerificationLog } from "../models/VerificationLog";
 import { validate, parseQuery } from "../middleware/validate";
 import { submitLimiter } from "../middleware/rateLimit";
 import { nearestCity, resolvePlace } from "../services/gazetteer";
 import { geohashEncode } from "../services/geo";
-import { enqueue } from "../services/pipeline";
+import { enqueue, dedup } from "../services/pipeline";
+import { publishReport } from "../services/events";
+import { checkHotspot } from "../services/hotspots";
 
 const router = Router();
 export const CATEGORIES = ["rainfall", "thunderstorm", "flooding", "heatwave", "fog", "dust_storm", "strong_winds", "other"] as const;
@@ -56,6 +60,141 @@ router.post("/", submitLimiter, validate(createReportSchema), async (req: Reques
 
   enqueue(report.reportId);
   res.status(201).json({ reportId: report.reportId, status: report.verificationStatus });
+});
+
+// POST /api/reports/ingest: ingest pre-enriched social & API reports from Python ML / Spark
+router.post("/ingest", async (req: Request, res: Response) => {
+  const ingestKey = req.headers["x-ingest-key"] || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, "") : "");
+  const expectedKey = process.env.INGEST_KEY || "national-weather-shared-ingest-key-2026";
+  if (ingestKey !== expectedKey) {
+    return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Invalid or missing ingest key" } });
+  }
+
+  const rawReports = Array.isArray(req.body)
+    ? req.body
+    : Array.isArray(req.body?.reports)
+    ? req.body.reports
+    : [req.body];
+
+  let inserted = 0;
+  let skipped = 0;
+  const sampleIds: string[] = [];
+
+  for (const item of rawReports) {
+    if (!item || typeof item !== "object") continue;
+    const reportId = String(item.reportId || item.post_id || item.uri || item.url || randomUUID()).trim();
+    if (!reportId) continue;
+
+    // Insert-or-ignore: never overwrite existing reports or moderator decisions (FR-TRU-10 / Step 8)
+    const existing = await Report.findOne({ reportId });
+    if (existing) {
+      skipped++;
+      continue;
+    }
+
+    const now = new Date();
+    const submittedAt = item.submittedAt ? new Date(item.submittedAt) : now;
+    const ingestedAt = item.ingestedAt ? new Date(item.ingestedAt) : now;
+
+    let location = item.location;
+    let geohash = item.geohash;
+    const precision = item.locationPrecision || (location ? "city" : "unknown");
+    if (!location && item.lat !== undefined && item.lon !== undefined && item.lat !== null && item.lon !== null) {
+      const lat = Number(item.lat), lon = Number(item.lon);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        location = { type: "Point", coordinates: [lon, lat] };
+        geohash = geohash || geohashEncode(lat, lon);
+      }
+    }
+
+    const rawText = String(item.rawText || item.text || "").trim();
+    if (!rawText) {
+      skipped++;
+      continue;
+    }
+
+    const category = (CATEGORIES.includes(item.category) ? item.category : "other") as EventCategory;
+    const status = item.verificationStatus === "pending" ? "needs_review" : (item.verificationStatus || "needs_review");
+
+    const report = new Report({
+      reportId,
+      sourceType: item.sourceType || "social",
+      sourceId: item.sourceId || `${item.sourceType || "social"}:external`,
+      sourceRef: item.sourceRef || item.uri || item.url,
+      rawText,
+      language: item.language || "en",
+      hashtags: Array.isArray(item.hashtags) ? item.hashtags : [],
+      submittedAt,
+      ingestedAt,
+      location,
+      locationPrecision: precision,
+      city: item.city,
+      state: item.state,
+      district: item.district,
+      geohash,
+      media: Array.isArray(item.media) ? item.media : [],
+      claimedCategory: item.claimedCategory,
+      category,
+      categoryConfidence: item.categoryConfidence !== undefined ? Number(item.categoryConfidence) : 0.5,
+      lowConfidence: Boolean(item.lowConfidence),
+      modelVersion: item.modelVersion || "py-tfidf-1.0.0",
+      trustScore: item.trustScore !== undefined ? Number(item.trustScore) : 40,
+      trustBreakdown: item.trustBreakdown,
+      trustReasons: Array.isArray(item.trustReasons) ? item.trustReasons : [],
+      verificationStatus: status,
+      verifiedBy: item.verifiedBy || null,
+      observation: item.observation,
+    });
+
+    // Group into clusters if coordinates exist
+    if (report.location?.coordinates?.length === 2 && report.locationPrecision !== "unknown") {
+      try {
+        const d = await dedup(report, report.category as EventCategory);
+        report.clusterId = d.cluster.clusterId;
+        report.clusterSize = d.cluster.reportCount;
+        report.isNewCluster = d.isNew;
+        checkHotspot(d.cluster.clusterId).catch(() => undefined);
+      } catch (err) {
+        console.warn(`[ingest] dedup error for ${reportId}:`, (err as Error).message);
+      }
+    }
+
+    await report.save();
+    inserted++;
+    if (sampleIds.length < 5) sampleIds.push(report.reportId);
+
+    // Track source
+    await Source.updateOne(
+      { sourceId: report.sourceId },
+      {
+        $setOnInsert: {
+          sourceId: report.sourceId,
+          type: report.sourceType,
+          reliability: report.sourceType === "api" ? 0.95 : 0.4,
+          allowListed: report.sourceType === "api",
+          blocked: false,
+          approvedCount: 0,
+          rejectedCount: 0,
+        },
+        $inc: { reportCount: 1 },
+      },
+      { upsert: true }
+    );
+
+    // Verification audit log
+    await VerificationLog.create({
+      reportId: report.reportId,
+      actor: "python-ml",
+      fromStatus: "raw",
+      toStatus: report.verificationStatus,
+      comment: `Ingested from ${report.sourceType}: trust ${report.trustScore}`,
+    });
+
+    // Real-time SSE push
+    publishReport(report);
+  }
+
+  res.status(201).json({ success: true, inserted, skipped, total: rawReports.length, sampleIds });
 });
 
 const listQuery = z.object({

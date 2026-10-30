@@ -8,8 +8,9 @@ import { CITIES, STATES, nearestCity, submit, uploadMedia } from "../api/gateway
 import { CATEGORY_LABELS, EVENT_CATEGORIES } from "../api/types";
 import type { EventCategory } from "../api/types";
 import { useToast } from "../context";
+import { MAP_TILES, MAP_ATTRIBUTION, MAP_SUBDOMAINS } from "../config/map";
 
-const TILES = import.meta.env.VITE_NO_TILES === "1" ? null : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+
 const OKT = ["image/jpeg", "image/png", "image/webp", "video/mp4"];
 type Pos = { lat: number; lng: number };
 
@@ -88,7 +89,7 @@ export function ReportForm() {
       <section className="formcard"><h3>Location</h3>
         <div className="grid g2"><label className="f">City *<input list="cities" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Mumbai" /><datalist id="cities">{cities.map((c) => <option key={c[0]} value={c[0]} />)}</datalist></label><label className="f">State *<select value={state} onChange={(e) => setState(e.target.value)}><option value="">Select state</option>{STATES.map((s) => <option key={s}>{s}</option>)}</select></label></div>
         <div className="grid g2"><label className="f">Date &amp; Time<input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></label><label className="f">GPS Coordinates<div style={{ display: "flex", gap: 8 }}><input readOnly value={pos ? `${pos.lat}, ${pos.lng}` : ""} placeholder="lat, lng (auto-detect)" className="mono" /><button type="button" className="btn out" onClick={locate}>Detect</button></div></label></div>
-        <div className="pickmap"><MapContainer center={[22.6, 79]} zoom={5} style={{ height: "100%" }}>{TILES && <TileLayer url={TILES} subdomains="abcd" attribution="&copy; OpenStreetMap, &copy; CARTO" />}<Pick pos={pos} onPick={put} /></MapContainer></div><span className="sub">Or tap the map to drop a pin.</span>
+        <div className="pickmap"><MapContainer center={[22.6, 79]} zoom={5} style={{ height: "100%" }}>{MAP_TILES && <TileLayer url={MAP_TILES} subdomains={MAP_SUBDOMAINS} attribution={MAP_ATTRIBUTION} />}<Pick pos={pos} onPick={put} /></MapContainer></div><span className="sub">Or tap the map to drop a pin.</span>
       </section>
       <section className="formcard"><h3>Evidence upload</h3>
         <div className={`drop${over ? " over" : ""}`} style={{ padding: 34 }} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={drop} role="button" tabIndex={0} onClick={() => input.current?.click()} onKeyDown={(e) => e.key === "Enter" && input.current?.click()}>

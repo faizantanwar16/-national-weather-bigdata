@@ -6,8 +6,9 @@ import { SEV_COLOR, listAlerts, listReports } from "../api/gateway";
 import type { Severity, WxAlert } from "../api/gateway";
 import { CATEGORY_LABELS } from "../api/types";
 import { ApiDown, Skeleton, catOf, useLoad } from "../ui";
+import { MAP_TILES, MAP_ATTRIBUTION, MAP_SUBDOMAINS } from "../config/map";
 
-const TILES = import.meta.env.VITE_NO_TILES === "1" ? null : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+
 const SEVS: Severity[] = ["extreme", "severe", "moderate", "low"];
 const when = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
 
@@ -42,7 +43,7 @@ export function Alerts() {
     );
   };
   const AMap = ({ h }: { h: number }) => (
-    <div className="amap" style={{ height: h }}><MapContainer center={[22.5, 80]} zoom={4} minZoom={3} style={{ height: "100%" }} scrollWheelZoom={false}>{TILES && <TileLayer url={TILES} subdomains="abcd" attribution="&copy; OpenStreetMap, &copy; CARTO" />}{list.map((a) => <CircleMarker key={a.id} center={[a.lat, a.lng]} radius={9} pathOptions={{ color: "#fff", weight: 1.5, fillColor: SEV_COLOR[a.severity], fillOpacity: 0.95 }} eventHandlers={{ click: () => setOpen(a.id) }}><MapTip>{a.title}</MapTip></CircleMarker>)}</MapContainer></div>
+    <div className="amap" style={{ height: h }}><MapContainer center={[22.5, 80]} zoom={4} minZoom={3} style={{ height: "100%" }} scrollWheelZoom={false}>{MAP_TILES && <TileLayer url={MAP_TILES} subdomains={MAP_SUBDOMAINS} attribution={MAP_ATTRIBUTION} />}{list.map((a) => <CircleMarker key={a.id} center={[a.lat, a.lng]} radius={9} pathOptions={{ color: "#fff", weight: 1.5, fillColor: SEV_COLOR[a.severity], fillOpacity: 0.95 }} eventHandlers={{ click: () => setOpen(a.id) }}><MapTip>{a.title}</MapTip></CircleMarker>)}</MapContainer></div>
   );
   return (
     <>

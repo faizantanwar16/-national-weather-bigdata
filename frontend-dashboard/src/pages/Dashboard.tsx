@@ -10,8 +10,9 @@ import { CATEGORY_LABELS, EVENT_CATEGORIES } from "../api/types";
 import type { EventCategory } from "../api/types";
 import { CatBadge, Gauge, Signals, StatusBadge, catOf, place, timeAgo, useLoad } from "../ui";
 import { useToast } from "../context";
+import { MAP_TILES, MAP_ATTRIBUTION, MAP_SUBDOMAINS } from "../config/map";
 
-const TILES = import.meta.env.VITE_NO_TILES === "1" ? null : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+
 const HOUR = 3600000, DAY = 86400000;
 type Preset = "24h" | "7d" | "30d" | "custom";
 const presetRange = (p: Preset) => ({ from: new Date(Date.now() - (p === "24h" ? DAY : p === "7d" ? 7 * DAY : 30 * DAY)).toISOString(), to: "" });
@@ -93,7 +94,7 @@ export function Dashboard() {
     <div className="stage">
       <div className="mapbox">
         <MapContainer center={[22.6, 80]} zoom={5} minZoom={4} preferCanvas style={{ height: "100%" }} zoomControl={false} worldCopyJump>
-          {TILES && <TileLayer attribution="&copy; OpenStreetMap, &copy; CARTO" url={TILES} subdomains="abcd" />}
+          {MAP_TILES && <TileLayer attribution={MAP_ATTRIBUTION} url={MAP_TILES} subdomains={MAP_SUBDOMAINS} />}
           {grid.map((l, i) => <Polyline key={i} positions={l} pathOptions={{ color: "#5BA2FF", weight: 1, opacity: 0.1 }} interactive={false} />)}
           <Fly to={fly} />
           {near && <Circle center={[near.lat, near.lng]} radius={near.km * 1000} pathOptions={{ color: "#5BA2FF", weight: 1.5, dashArray: "6 6", fillOpacity: 0.05 }} interactive={false} />}

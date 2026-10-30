@@ -66,7 +66,7 @@ function cosine(a: Record<string, number>, b: Record<string, number>): number {
 }
 
 // ---------------------------------------------------------------- stage 1: dedup
-async function dedup(r: IReport, cat: EventCategory): Promise<{ cluster: ICluster; isNew: boolean }> {
+export async function dedup(r: IReport, cat: EventCategory): Promise<{ cluster: ICluster; isNew: boolean }> {
   const [maxKm, windowMin, threshold] = await Promise.all([getSetting<number>("dedup.maxDistanceKm"), getSetting<number>("dedup.windowMinutes"), getSetting<number>("dedup.similarityThreshold")]);
   const t = r.submittedAt.getTime(), src = r.sourceId ?? `${r.sourceType}:anonymous`, vec = tf(tokens(r.rawText));
   const pt = coordsOf(r);
@@ -222,6 +222,7 @@ async function rescoreMembers(cluster: ICluster, threshold: number) {
 export async function processReport(reportId: string): Promise<void> {
   const r = await Report.findOne({ reportId });
   if (!r || r.verificationStatus !== "pending") return;
+  if (r.sourceType !== "citizen" && r.category && r.trustScore !== undefined) return;
   const [threshold, minConf] = await Promise.all([getSetting<number>("trust.autoVerifyThreshold"), getSetting<number>("classification.minConfidence")]);
 
   const here = coordsOf(r);
@@ -293,7 +294,7 @@ export async function drain(): Promise<void> { await chain; }
 
 /** Picks up pending reports that were inserted by someone else (or left over after a crash). */
 export async function sweepPending() {
-  const stale = await Report.find({ verificationStatus: "pending", ingestedAt: { $lt: new Date(Date.now() - 5000) } }).sort({ submittedAt: 1 }).limit(200).select("reportId");
+  const stale = await Report.find({ verificationStatus: "pending", sourceType: "citizen", ingestedAt: { $lt: new Date(Date.now() - 5000) } }).sort({ submittedAt: 1 }).limit(200).select("reportId");
   stale.forEach((r) => enqueue(r.reportId));
 }
 
