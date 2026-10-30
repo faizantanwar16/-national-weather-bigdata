@@ -41,14 +41,20 @@ export function Dashboard() {
   const [playing, setPlaying] = useState(false);
   const [ticker, setTicker] = useState<Rep[]>([]);
   const [fly, setFly] = useState<[number, number] | null>(null);
-
-  const filters = { category: cats.length ? cats : undefined, status: scope === "all" ? undefined : scope, state: stateF || undefined, dateFrom: range.from || undefined, dateTo: range.to ? `${range.to}T23:59:59` : undefined, limit: demo ? 500 : 100 };
+  const [now, setNow] = useState(() => Date.now());
+  const filters = { category: cats.length ? cats : undefined, status: scope === "all" ? undefined : scope, state: stateF || undefined, dateFrom: range.from || undefined, dateTo: range.to ? `${range.to}T23:59:59` : undefined, limit: 500 };
   const q = useLoad(() => listReports(filters), [JSON.stringify(filters), demo], 30000);
   const feed = useLiveFeed((r) => { if (r.rawText) setTicker((t) => [r as Rep, ...t].slice(0, 8)); q.reload(); });
 
+  // Keep "now" fresh without calling Date.now() during render
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
   const items = useMemo(() => (q.data?.items ?? []).filter((r) => r.location && (!near || distKm([near.lat, near.lng], [r.location.coordinates[1], r.location.coordinates[0]]) <= near.km)), [q.data, near]);
-  const start = range.from ? +new Date(range.from) : items.length ? Math.min(...items.map((r) => +new Date(r.submittedAt))) : Date.now() - 7 * DAY;
-  const end = Date.now();
+  const start = range.from ? +new Date(range.from) : items.length ? Math.min(...items.map((r) => +new Date(r.submittedAt))) : now - 7 * DAY;
+  const end = now;
   const visible = useMemo(() => (cursor === null ? items : items.filter((r) => +new Date(r.submittedAt) <= cursor)), [items, cursor]);
 
   useEffect(() => {

@@ -166,7 +166,7 @@ export async function uploadMedia(files: File[]): Promise<string[]> {
   return urls;
 }
 export function submit(body: Parameters<typeof api.submitReport>[0], media: string[]): Promise<{ reportId: string; status: string }> {
-  return live(() => api.submitReport(body), () => {
+  return live(() => api.submitReport({ ...body, media: media.map((url) => ({ url, type: url.endsWith(".mp4") ? "video" as const : "image" as const })) }), () => {
     const c = CITIES.find((x) => x[0].toLowerCase() === (body.city ?? "").toLowerCase());
     const lat = body.latitude ?? c?.[2], lng = body.longitude ?? c?.[3], now = new Date().toISOString();
     const r: Rep = { reportId: crypto.randomUUID(), sourceType: "citizen", sourceId: "citizen:anonymous", rawText: body.rawText, claimedCategory: body.claimedCategory, city: body.city, state: body.state ?? c?.[1], location: lat !== undefined && lng !== undefined ? { type: "Point", coordinates: [lng, lat] } : undefined, locationPrecision: body.latitude !== undefined ? "exact" : c ? "city" : "unknown", media: media.map((url) => ({ url, type: "image" as const })), verificationStatus: "pending", verifiedBy: null, submittedAt: now, ingestedAt: now };
@@ -206,12 +206,9 @@ export function useLiveFeed(onReport: (r: Partial<Rep>) => void) {
 // ---------- admin API ----------
 export const queue = (f: { category?: string; state?: string } = {}): Promise<{ items: Rep[] }> => live(() => api.fetchQueue(f) as Promise<{ items: Rep[] }>, () => ({ items: DB.filter((r) => r.verificationStatus === "needs_review" && (!f.category || r.category === f.category) && (!f.state || r.state === f.state)).sort((a, b) => (a.trustScore ?? 0) - (b.trustScore ?? 0)).slice(0, 100) }));
 export const detail = (id: string): Promise<Detail> => live(async () => {
-  let r: Rep | null = null;
-  try { r = await raw<Rep>(`/api/admin/reports/${id}`); } catch { /* optional endpoint */ }
-  if (!r) r = ((await api.fetchQueue()).items.find((x) => x.reportId === id) as Rep | undefined) ?? (await api.fetchReport(id) as Rep);
-  let cluster: Rep[] = [];
-  if (r.clusterId) { try { cluster = (await raw<{ reports?: Rep[] }>(`/api/clusters/${r.clusterId}`)).reports ?? []; } catch { /* optional */ } }
-  return { report: r, cluster, source: null };
+  try { const d = await raw<Detail>(`/api/admin/reports/${id}`); if (d?.report) return { report: d.report, cluster: d.cluster ?? [], source: d.source ?? null }; } catch { /* older backend without this endpoint */ }
+  const r = ((await api.fetchQueue()).items.find((x) => x.reportId === id) as Rep | undefined) ?? (await api.fetchReport(id) as Rep);
+  return { report: r, cluster: [], source: null };
 }, () => { const r = DB.find((x) => x.reportId === id); if (!r) throw new Error("Report not found"); return { report: r, cluster: DB.filter((x) => x.clusterId === r.clusterId && x.reportId !== id).slice(0, 8), source: SOURCES.find((s) => s.id === r.sourceId) ?? null }; });
 export const verify = (id: string, action: "approve" | "reject", comment?: string, override?: EventCategory): Promise<unknown> => live(() => api.verifyReport(id, action, comment, override), () => {
   const r = DB.find((x) => x.reportId === id); if (!r) throw new Error("Report not found");
@@ -255,7 +252,7 @@ export const listAlerts = async (): Promise<{ items: WxAlert[]; sample: boolean 
 export interface Conditions { city: string; state: string; temp: number; feels: number; desc: string; high: number; low: number; humidity: number; wind: number; windDir: string; visibility: number; pressure: number; cloud: number; uv: number; aqi: number; rain: boolean; sample: boolean }
 export const getConditions = async (city: string): Promise<Conditions> => {
   const c = CITIES.find((x) => x[0] === city) ?? CITIES[1];
-  if (!demo) { try { const r = await raw<Conditions>(`/api/weather?city=${encodeURIComponent(city)}`); return { ...r, sample: false }; } catch { /* endpoint not built yet */ } }
+  if (!demo) { try { const r = await raw<Conditions & { configured?: boolean }>(`/api/weather?city=${encodeURIComponent(city)}`); if (r.configured !== false && typeof r.temp === "number") return { ...r, sample: false }; } catch { /* backend has no weather key yet: use the sample below */ } }
   const r = rng(Math.floor(c[2] * 100 + c[3]) + new Date().getDate()), tag = c[4], hr = new Date().getHours();
   const hiBase = 36 - (c[2] - 8) * 0.28 - (tag === "hill" ? 9 : 0) - (tag === "coast" ? 3 : 0), high = Math.round(hiBase + r() * 2), low = Math.round(high - 8 + r() * 2 - (tag === "coast" ? 3 : 0));
   const temp = Math.round(low + (high - low) * Math.max(0, Math.sin(((hr - 6) / 14) * Math.PI)));

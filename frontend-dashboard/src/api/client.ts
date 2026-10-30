@@ -72,6 +72,7 @@ export function submitReport(body: {
   state?: string;
   latitude?: number;
   longitude?: number;
+  media?: { url: string; type: "image" | "video" }[];
 }) {
   return request<{ reportId: string; status: string }>("/api/reports", {
     method: "POST",

@@ -50,6 +50,8 @@ export interface IReport extends Document {
   verificationStatus: VerificationStatus;
   verifiedBy?: VerifiedBy;
   stageTimes?: Record<string, Date>;
+  // Official observation attached to sourceType "api" reports (used by the official-data-match signal)
+  observation?: { precipMm?: number; tempC?: number; visibilityM?: number; windKmh?: number; cloudPct?: number; alert?: string };
 }
 
 const MediaItemSchema = new Schema<IMediaItem>(
@@ -108,6 +110,7 @@ const ReportSchema = new Schema<IReport>({
   },
   verifiedBy: { type: String, enum: ["system", "moderator", null], default: null },
   stageTimes: { type: Schema.Types.Mixed },
+  observation: { type: Schema.Types.Mixed },
 });
 
 ReportSchema.index({ location: "2dsphere" });
@@ -116,5 +119,7 @@ ReportSchema.index({ category: 1, verificationStatus: 1, submittedAt: -1 });
 ReportSchema.index({ state: 1, submittedAt: -1 });
 ReportSchema.index({ clusterId: 1 });
 ReportSchema.index({ sourceId: 1 });
+ReportSchema.index({ verificationStatus: 1, ingestedAt: 1 });
+ReportSchema.index({ sourceType: 1, submittedAt: -1 });
 
 export const Report = model<IReport>("Report", ReportSchema);
